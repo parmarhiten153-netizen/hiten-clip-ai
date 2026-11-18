@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hiten Clip AI</title>
+<style>
+:root{--bg:#0a0a0f;--panel:#14141d;--panel2:#1b1b27;--purple:#8b5cf6;--pink:#d946ef;--text:#f5f4fa;--muted:#9a98aa;--line:#292838}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% -10%,#2b1544 0,transparent 40%),var(--bg);color:var(--text);font:15px Inter,system-ui,Segoe UI,sans-serif}
+header{height:72px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 5%;position:sticky;top:0;background:#0b0b10eF;backdrop-filter:blur(14px);z-index:5}
+.brand{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:800;letter-spacing:-.5px}.logo{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,var(--purple),var(--pink));display:grid;place-items:center;font-size:18px}
+.brand span{color:#c4a6ff}.badge{border:1px solid #47345d;color:#c9a8ff;padding:6px 11px;border-radius:99px;font-size:12px}
+main{max-width:1200px;margin:34px auto;padding:0 22px}.hero{margin-bottom:26px}.hero h1{font-size:clamp(28px,4vw,44px);letter-spacing:-1.4px;margin:0 0 10px}.hero h1 em{font-style:normal;background:linear-gradient(90deg,#a78bfa,#e879f9);color:transparent;background-clip:text}.hero p{color:var(--muted);margin:0}
+.layout{display:grid;grid-template-columns:1.5fr .85fr;gap:20px}.panel{background:linear-gradient(160deg,#171721,#111118);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 12px 35px #0002}.panel h2{font-size:16px;margin:0 0 18px}.drop{border:1.5px dashed #49465f;border-radius:16px;min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;transition:.2s;cursor:pointer;background:#171520}.drop:hover,.drop.drag{border-color:#a78bfa;background:#20192b}.uploadIcon{font-size:36px;margin-bottom:8px}.drop strong{font-size:15px}.drop p{color:var(--muted);font-size:13px;margin:7px 0}.browse{display:inline-block;margin-top:10px;background:#7545cf;padding:9px 16px;border-radius:9px;font-weight:700;font-size:13px}
+input[type=file]{display:none}video{width:100%;max-height:390px;background:#000;border-radius:12px;margin-top:16px;display:none}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:17px}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:7px}.field select,.field input[type=text]{width:100%;background:#20202b;border:1px solid #363647;color:white;padding:11px;border-radius:9px;outline:none}
+.timeline{margin-top:16px;background:#20202b;border-radius:10px;padding:13px}.timeRow{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-bottom:8px}.range{width:100%;accent-color:#a78bfa}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:17px}.btn{border:0;border-radius:10px;padding:12px 17px;font-weight:700;cursor:pointer;color:white}.primary{background:linear-gradient(100deg,#7c3aed,#c026d3)}.secondary{background:#252532;border:1px solid #373747}.btn:disabled{opacity:.45;cursor:not-allowed}
+.side{display:flex;flex-direction:column;gap:16px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat{background:#1c1c27;padding:14px;border-radius:12px}.stat b{font-size:20px;display:block}.stat small{color:var(--muted)}.clipList{display:flex;flex-direction:column;gap:9px}.clip{border:1px solid var(--line);padding:12px;border-radius:11px;display:flex;align-items:center;justify-content:space-between;gap:8px}.clip .clipname{font-weight:600;font-size:13px}.clip small{color:var(--muted)}.clip a{color:#c4a6ff;font-size:12px;text-decoration:none;font-weight:700}
+.note{color:var(--muted);font-size:12px;line-height:1.55;margin-top:14px}.status{margin-top:12px;color:#c4a6ff;font-size:13px;min-height:20px}.footer{color:#77758a;text-align:center;padding:34px 0;font-size:12px}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.side{display:grid;grid-template-columns:1fr 1fr}.side .panel:last-child{grid-column:1/-1}}
+@media(max-width:540px){header{padding:0 16px}.brand{font-size:17px}.side{display:flex}.controls{grid-template-columns:1fr 1fr}main{padding:0 14px}}
+</style>
+</head>
+<body>
+<header><div class="brand"><div class="logo">✂</div>Hiten <span>Clip AI</span></div><div class="badge">BROWSER CLIPPER</div></header>
+<main>
+<div class="hero"><h1>Turn long videos into <em>viral clips.</em></h1><p>Upload a video, choose your moments, and export clips ready for Shorts, Reels and TikTok.</p></div>
+<div class="layout">
+<section class="panel">
+<h2>🎬 Video workspace</h2>
+<div class="drop" id="drop"><div class="uploadIcon">⬆️</div><strong>Drop your video here</strong><p>MP4, MOV, WebM supported (your file stays in your browser)</p><span class="browse">Choose video</span><input id="file" type="file" accept="video/*"></div>
+<video id="video" controls playsinline></video>
+<div class="controls">
+<div class="field"><label>Clip duration</label><select id="duration"><option value="30">30 seconds</option><option value="60">60 seconds</option><option value="90">90 seconds</option><option value="custom">Custom (set with timeline)</option></select></div>
+<div class="field"><label>Aspect ratio</label><select id="ratio"><option value="9:16">Vertical 9:16 (Shorts)</option><option value="16:9">Landscape 16:9</option><option value="1:1">Square 1:1</option></select></div>
+<div class="field"><label>Caption language (basic setup)</label><select id="lang"><option>English</option><option>Hindi</option><option>Gujarati</option><option>Auto / later AI</option></select></div>
+<div class="field"><label>Clip title</label><input id="cliptitle" type="text" placeholder="My highlight clip"></div>
+</div>
+<div class="timeline" id="timeline" style="display:none"><div class="timeRow"><span>Start: <b id="startLabel">0:00</b></span><span>Video: <b id="durationLabel">0:00</b></span></div><input class="range" id="start" type="range" min="0" max="0" step="0.1" value="0"><div class="timeRow" style="margin:8px 0 0"><span>Drag to choose clip start</span><span id="endLabel">End: 0:30</span></div></div>
+<div class="actions"><button class="btn primary" id="make" disabled>✂ Create clip</button><button class="btn secondary" id="reset">Reset</button></div>
+<div class="status" id="status"></div>
+<p class="note">This starter version creates clips by selecting a start time and duration. AI highlight detection, speech-to-text captions, and vertical smart reframing need an additional processing service/API to be connected.</p>
+</section>
+<aside class="side">
+<div class="panel"><h2>📊 Your workspace</h2><div class="stats"><div class="stat"><b id="clipCount">0</b><small>Clips created</small></div><div class="stat"><b id="fileSize">--</b><small>Video loaded</small></div></div></div>
+<div class="panel"><h2>📁 Created clips</h2><div class="clipList" id="clips"><div class="note">Your clips will appear here when you create them.</div></div></div>
+<div class="panel"><h2>✨ Next features</h2><div class="note">• AI highlight finder<br>• Auto subtitles (Hindi / English)<br>• Vertical smart crop<br>• Batch clip export<br>• Login & cloud clip history</div></div>
+</aside></div>
+<footer class="footer">Hiten Clip AI · Your videos are processed locally for this basic clipping demo.</footer>
+</main>
+<script>
+const fileInput=document.getElementById('file'),drop=document.getElementById('drop'),video=document.getElementById('video'),start=document.getElementById('start'),duration=document.getElementById('duration'),status=document.getElementById('status'),make=document.getElementById('make'),clips=document.getElementById('clips');
+let sourceFile=null,clipCount=0;
+function fmt(s){s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+function loadFile(f){if(!f||!f.type.startsWith('video/')){status.textContent='Please choose a valid video file.';return}sourceFile=f;video.src=URL.createObjectURL(f);video.style.display='block';video.onloadedmetadata=()=>{start.max=Math.max(0,video.duration-1);document.getElementById('durationLabel').textContent=fmt(video.duration);document.getElementById('timeline').style.display='block';make.disabled=false;updateTimeline();document.getElementById('fileSize').textContent=(f.size/1024/1024).toFixed(1)+' MB';status.textContent='Video loaded. Pick a start point and create a clip.'}}
+drop.addEventListener('click',()=>fileInput.click());fileInput.addEventListener('change',e=>loadFile(e.target.files[0]));
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag')});drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag');loadFile(e.dataTransfer.files[0])});
+function chosenDuration(){let v=duration.value;return v==='custom'?Math.min(60,video.duration):Number(v)}
+function updateTimeline(){document.getElementById('startLabel').textContent=fmt(Number(start.value));document.getElementById('endLabel').textContent='End: '+fmt(Math.min(video.duration,Number(start.value)+chosenDuration()))}
+start.addEventListener('input',updateTimeline);duration.addEventListener('change',updateTimeline);
+make.addEventListener('click',async()=>{if(!sourceFile)return;const s=Number(start.value),d=chosenDuration(),e=Math.min(video.duration,s+d);status.textContent='Preparing clip…';try{const blob=await cutClip(sourceFile,s,e);clipCount++;document.getElementById('clipCount').textContent=clipCount;const url=URL.createObjectURL(blob);if(clipCount===1)clips.innerHTML='';const name=(document.getElementById('cliptitle').value.trim()||'Clip '+clipCount)+'.webm';const item=document.createElement('div');item.className='clip';item.innerHTML='<div><div class="clipname">Clip '+clipCount+'</div><small>'+fmt(s)+' – '+fmt(e)+' · '+fmt(e-s)+'</small></div><a download="'+name.replace(/"/g,'')+'" href="'+url+'">Download</a>';clips.prepend(item);status.textContent='Clip created! Download it from Created clips.'}catch(err){status.textContent='Clip creation failed: '+err.message}});
+async function cutClip(file,s,e){const mime='video/webm;codecs=vp8,opus';if(!MediaRecorder.isTypeSupported(mime))throw new Error('Your browser does not support WebM recording. Try Chrome or Edge.');const stream=video.captureStream();const rec=new MediaRecorder(stream,{mimeType:mime});const parts=[];rec.ondataavailable=x=>{if(x.data.size)parts.push(x.data)};const stopped=new Promise(resolve=>rec.onstop=resolve);video.currentTime=s;await new Promise(resolve=>{const fn=()=>{video.removeEventListener('seeked',fn);resolve()};video.addEventListener('seeked',fn)});video.muted=true;rec.start();await video.play();await new Promise(resolve=>{const check=()=>{if(video.currentTime>=e||video.ended){video.pause();resolve()}else requestAnimationFrame(check)};check()});rec.stop();await stopped;video.muted=false;return new Blob(parts,{type:'video/webm'})}
+document.getElementById('reset').onclick=()=>{fileInput.value='';sourceFile=null;video.pause();video.removeAttribute('src');video.style.display='none';document.getElementById('timeline').style.display='none';make.disabled=true;status.textContent='Workspace reset.'};
+</script>
+</body></html>
