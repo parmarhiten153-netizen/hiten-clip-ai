@@ -38,7 +38,11 @@ input[type=file]{display:none}video{width:100%;max-height:390px;background:#000;
 <div class="timeline" id="timeline" style="display:none"><div class="timeRow"><span>Start: <b id="startLabel">0:00</b></span><span>Video: <b id="durationLabel">0:00</b></span></div><input class="range" id="start" type="range" min="0" max="0" step="0.1" value="0"><div class="timeRow" style="margin:8px 0 0"><span>Drag to choose clip start</span><span id="endLabel">End: 0:30</span></div></div>
 <div class="actions"><button class="btn primary" id="make" disabled>✂ Create clip</button><button class="btn secondary" id="reset">Reset</button></div>
 <div class="status" id="status"></div>
-<p class="note">This starter version creates clips by selecting a start time and duration. AI highlight detection, speech-to-text captions, and vertical smart reframing need an additional processing service/API to be connected.</p>
+<div class="panel" style="margin-top:18px;background:#20192b;border-color:#5b3b83"><h2>🧠 AI Highlights & Auto Captions</h2>
+<div class="field"><label>AI backend URL (Render service URL)</label><input id="apiUrl" type="text" placeholder="https://your-service.onrender.com"></div>
+<div class="actions"><button class="btn primary" id="analyzeAI" disabled>✨ Find best moments with AI</button></div>
+<div id="aiResults" class="clipList" style="margin-top:14px"></div>
+<p class="note">Uses Whisper speech recognition to transcribe your video, then ranks speech-rich, expressive moments. Choose a highlight to export an MP4 with burned-in captions.</p></div>
 </section>
 <aside class="side">
 <div class="panel"><h2>📊 Your workspace</h2><div class="stats"><div class="stat"><b id="clipCount">0</b><small>Clips created</small></div><div class="stat"><b id="fileSize">--</b><small>Video loaded</small></div></div></div>
@@ -49,9 +53,9 @@ input[type=file]{display:none}video{width:100%;max-height:390px;background:#000;
 </main>
 <script>
 const fileInput=document.getElementById('file'),drop=document.getElementById('drop'),video=document.getElementById('video'),start=document.getElementById('start'),duration=document.getElementById('duration'),status=document.getElementById('status'),make=document.getElementById('make'),clips=document.getElementById('clips');
-let sourceFile=null,clipCount=0;
+let sourceFile=null,clipCount=0; document.getElementById('analyzeAI').disabled=true;
 function fmt(s){s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
-function loadFile(f){if(!f||!f.type.startsWith('video/')){status.textContent='Please choose a valid video file.';return}sourceFile=f;video.src=URL.createObjectURL(f);video.style.display='block';video.onloadedmetadata=()=>{start.max=Math.max(0,video.duration-1);document.getElementById('durationLabel').textContent=fmt(video.duration);document.getElementById('timeline').style.display='block';make.disabled=false;updateTimeline();document.getElementById('fileSize').textContent=(f.size/1024/1024).toFixed(1)+' MB';status.textContent='Video loaded. Pick a start point and create a clip.'}}
+function loadFile(f){if(!f||!f.type.startsWith('video/')){status.textContent='Please choose a valid video file.';return}sourceFile=f;video.src=URL.createObjectURL(f);video.style.display='block';video.onloadedmetadata=()=>{start.max=Math.max(0,video.duration-1);document.getElementById('durationLabel').textContent=fmt(video.duration);document.getElementById('timeline').style.display='block';make.disabled=false;document.getElementById('analyzeAI').disabled=false;updateTimeline();document.getElementById('fileSize').textContent=(f.size/1024/1024).toFixed(1)+' MB';status.textContent='Video loaded. Pick a start point and create a clip.'}}
 drop.addEventListener('click',()=>fileInput.click());fileInput.addEventListener('change',e=>loadFile(e.target.files[0]));
 drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag')});drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag');loadFile(e.dataTransfer.files[0])});
 function chosenDuration(){let v=duration.value;return v==='custom'?Math.min(60,video.duration):Number(v)}
@@ -60,5 +64,25 @@ start.addEventListener('input',updateTimeline);duration.addEventListener('change
 make.addEventListener('click',async()=>{if(!sourceFile)return;const s=Number(start.value),d=chosenDuration(),e=Math.min(video.duration,s+d);status.textContent='Preparing clip…';try{const blob=await cutClip(sourceFile,s,e);clipCount++;document.getElementById('clipCount').textContent=clipCount;const url=URL.createObjectURL(blob);if(clipCount===1)clips.innerHTML='';const name=(document.getElementById('cliptitle').value.trim()||'Clip '+clipCount)+'.webm';const item=document.createElement('div');item.className='clip';item.innerHTML='<div><div class="clipname">Clip '+clipCount+'</div><small>'+fmt(s)+' – '+fmt(e)+' · '+fmt(e-s)+'</small></div><a download="'+name.replace(/"/g,'')+'" href="'+url+'">Download</a>';clips.prepend(item);status.textContent='Clip created! Download it from Created clips.'}catch(err){status.textContent='Clip creation failed: '+err.message}});
 async function cutClip(file,s,e){const mime='video/webm;codecs=vp8,opus';if(!MediaRecorder.isTypeSupported(mime))throw new Error('Your browser does not support WebM recording. Try Chrome or Edge.');const stream=video.captureStream();const rec=new MediaRecorder(stream,{mimeType:mime});const parts=[];rec.ondataavailable=x=>{if(x.data.size)parts.push(x.data)};const stopped=new Promise(resolve=>rec.onstop=resolve);video.currentTime=s;await new Promise(resolve=>{const fn=()=>{video.removeEventListener('seeked',fn);resolve()};video.addEventListener('seeked',fn)});video.muted=true;rec.start();await video.play();await new Promise(resolve=>{const check=()=>{if(video.currentTime>=e||video.ended){video.pause();resolve()}else requestAnimationFrame(check)};check()});rec.stop();await stopped;video.muted=false;return new Blob(parts,{type:'video/webm'})}
 document.getElementById('reset').onclick=()=>{fileInput.value='';sourceFile=null;video.pause();video.removeAttribute('src');video.style.display='none';document.getElementById('timeline').style.display='none';make.disabled=true;status.textContent='Workspace reset.'};
+
+const apiUrl=document.getElementById('apiUrl'), analyzeAI=document.getElementById('analyzeAI'), aiResults=document.getElementById('aiResults');
+analyzeAI.addEventListener('click',async()=>{
+ if(!sourceFile)return;
+ const base=apiUrl.value.trim().replace(/\/$/,'');
+ if(!base){status.textContent='Pehle Render backend URL paste karo.';return}
+ const fd=new FormData();fd.append('video',sourceFile);fd.append('duration',duration.value==='custom'?60:duration.value);fd.append('language',document.getElementById('lang').value==='Auto / later AI'?'auto':document.getElementById('lang').value);
+ status.textContent='Whisper AI video sun raha hai aur transcript bana raha hai. Pehli request mein model download ho sakta hai…';
+ analyzeAI.disabled=true;aiResults.innerHTML='';
+ try{
+  const res=await fetch(base+'/analyze',{method:'POST',body:fd});if(!res.ok)throw new Error(await res.text());
+  const data=await res.json();window.aiHighlights=data.highlights||[];status.textContent='Analysis complete. Language detected: '+data.language+'. '+window.aiHighlights.length+' highlight suggestions.';
+  window.aiHighlights.forEach((x,i)=>{const row=document.createElement('div');row.className='clip';const left=document.createElement('div');left.innerHTML='<div class="clipname">Highlight '+(i+1)+' · '+fmt(x.start)+'–'+fmt(x.end)+'</div><small>'+x.transcript.slice(0,130)+'</small>';const b=document.createElement('button');b.className='btn primary';b.textContent='Export MP4';b.onclick=()=>exportAI(x,base);row.append(left,b);aiResults.append(row)});
+ }catch(e){status.textContent='AI error: '+e.message+' | Backend URL aur service status check karo.'}finally{analyzeAI.disabled=false}
+});
+async function exportAI(x,base){
+ status.textContent='Captions ke saath MP4 render ho raha hai…';
+ const fd=new FormData();fd.append('video',sourceFile);fd.append('start',x.start);fd.append('end',x.end);fd.append('language',document.getElementById('lang').value==='Auto / later AI'?'auto':document.getElementById('lang').value);fd.append('aspect',document.getElementById('ratio').value);
+ try{const r=await fetch(base+'/export',{method:'POST',body:fd});if(!r.ok)throw new Error(await r.text());const blob=await r.blob();const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='hiten-ai-clip.mp4';a.click();URL.revokeObjectURL(url);status.textContent='MP4 clip with AI captions downloaded.'}catch(e){status.textContent='Export error: '+e.message}
+}
 </script>
 </body></html>
