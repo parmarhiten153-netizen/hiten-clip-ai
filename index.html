@@ -18,6 +18,7 @@ input[type=file]{display:none}video{width:100%;max-height:390px;background:#000;
 .note{color:var(--muted);font-size:12px;line-height:1.55;margin-top:14px}.status{margin-top:12px;color:#c4a6ff;font-size:13px;min-height:20px}.footer{color:#77758a;text-align:center;padding:34px 0;font-size:12px}
 @media(max-width:850px){.layout{grid-template-columns:1fr}.side{display:grid;grid-template-columns:1fr 1fr}.side .panel:last-child{grid-column:1/-1}}
 @media(max-width:540px){header{padding:0 16px}.brand{font-size:17px}.side{display:flex}.controls{grid-template-columns:1fr 1fr}main{padding:0 14px}}
+@media(max-width:540px){#ytPreview iframe{height:220px}}
 </style>
 </head>
 <body>
@@ -28,6 +29,19 @@ input[type=file]{display:none}video{width:100%;max-height:390px;background:#000;
 <section class="panel">
 <h2>🎬 Video workspace</h2>
 <div class="drop" id="drop"><div class="uploadIcon">⬆️</div><strong>Drop your video here</strong><p>MP4, MOV, WebM supported (your file stays in your browser)</p><span class="browse">Choose video</span><input id="file" type="file" accept="video/*"></div>
+
+<div class="panel" style="margin-top:18px">
+<h2>▶ YouTube Link & Channel</h2>
+<div class="field"><label>Paste a YouTube video URL</label><input id="youtubeLink" type="text" placeholder="https://www.youtube.com/watch?v=..."></div>
+<div class="actions"><button class="btn secondary" id="previewYT">Preview YouTube video</button><button class="btn primary" id="connectYT">Connect my YouTube channel</button></div>
+<div id="ytPreview" style="margin-top:12px"></div>
+<p class="note">A YouTube link can be previewed here. To create clips, upload a video file that you own or have permission to edit. The YouTube API does not authorize downloading other creators' videos.</p>
+<div class="field" style="margin-top:14px"><label>Upload title</label><input id="ytTitle" type="text" placeholder="AI suggested title"></div>
+<div class="field" style="margin-top:10px"><label>Description</label><input id="ytDescription" type="text" placeholder="Video description"></div>
+<div class="field" style="margin-top:10px"><label>Tags (comma separated)</label><input id="ytTags" type="text" placeholder="shorts, highlights, ..."></div>
+<div class="actions"><button class="btn primary" id="uploadYT" disabled>Upload selected video to my channel (Private)</button></div>
+<div class="status" id="ytStatus"></div>
+</div>
 <video id="video" controls playsinline></video>
 <div class="controls">
 <div class="field"><label>Clip duration</label><select id="duration"><option value="30">30 seconds</option><option value="60">60 seconds</option><option value="90">90 seconds</option><option value="custom">Custom (set with timeline)</option></select></div>
@@ -84,5 +98,46 @@ async function exportAI(x,base){
  const fd=new FormData();fd.append('video',sourceFile);fd.append('start',x.start);fd.append('end',x.end);fd.append('language',document.getElementById('lang').value==='Auto / later AI'?'auto':document.getElementById('lang').value);fd.append('aspect',document.getElementById('ratio').value);
  try{const r=await fetch(base+'/export',{method:'POST',body:fd});if(!r.ok)throw new Error(await r.text());const blob=await r.blob();const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='hiten-ai-clip.mp4';a.click();URL.revokeObjectURL(url);status.textContent='MP4 clip with AI captions downloaded.'}catch(e){status.textContent='Export error: '+e.message}
 }
+
+const youtubeLink=document.getElementById('youtubeLink');
+const ytPreview=document.getElementById('ytPreview');
+const ytStatus=document.getElementById('ytStatus');
+const uploadYT=document.getElementById('uploadYT');
+function youtubeId(value){
+ try{const u=new URL(value); if(u.hostname.includes('youtu.be')) return u.pathname.slice(1).split('/')[0];
+ if(u.hostname.includes('youtube.com')) return u.searchParams.get('v') || (u.pathname.match(/\/(?:shorts|embed)\/([^/?]+)/)||[])[1] || null;}catch(e){} return null;
+}
+document.getElementById('previewYT').onclick=()=>{
+ const id=youtubeId(youtubeLink.value.trim());
+ if(!id){ytStatus.textContent='Valid YouTube video link paste karo.';return;}
+ ytPreview.innerHTML='<iframe width="100%" height="315" style="border:0;border-radius:12px" src="https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'" title="YouTube video preview" allowfullscreen></iframe>';
+ ytStatus.textContent='Preview loaded. For clipping, use an authorized original video file.';
+};
+document.getElementById('connectYT').onclick=()=>{
+ const base=apiUrl.value.trim().replace(/\/$/,'');
+ if(!base){ytStatus.textContent='Pehle AI backend URL box mein Render URL paste karo.';return;}
+ window.open(base+'/auth/youtube','_blank','noopener');
+ ytStatus.textContent='Google authorization window opened. Approve access to your YouTube channel.';
+};
+async function checkYT(){
+ const base=apiUrl.value.trim().replace(/\/$/,'');
+ if(!base)return;
+ try{const r=await fetch(base+'/youtube/status');const d=await r.json();uploadYT.disabled=!d.connected;ytStatus.textContent=d.connected?'YouTube channel connected: '+(d.channel||'Your channel'):'Connect your YouTube channel first.';}catch(e){}
+}
+document.getElementById('connectYT').addEventListener('focus',checkYT);
+uploadYT.onclick=async()=>{
+ const base=apiUrl.value.trim().replace(/\/$/,'');
+ if(!sourceFile){ytStatus.textContent='Pehle apni authorized video file upload karo.';return;}
+ const fd=new FormData();fd.append('video',sourceFile);
+ fd.append('title',document.getElementById('ytTitle').value.trim()||'Hiten Clip AI Short');
+ fd.append('description',document.getElementById('ytDescription').value.trim());
+ fd.append('tags',document.getElementById('ytTags').value.trim());
+ fd.append('privacy_status','private');
+ uploadYT.disabled=true;ytStatus.textContent='Uploading as Private…';
+ try{const r=await fetch(base+'/youtube/upload',{method:'POST',body:fd});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Upload failed');ytStatus.textContent='Uploaded privately! Video ID: '+d.videoId+' . Review it in YouTube Studio before publishing.';}
+ catch(e){ytStatus.textContent='YouTube upload error: '+e.message;}
+ finally{uploadYT.disabled=false;}
+};
+
 </script>
 </body></html>
