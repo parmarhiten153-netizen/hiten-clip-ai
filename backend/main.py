@@ -2,7 +2,10 @@ import os, uuid, tempfile, subprocess, zipfile, json, re
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
+from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 from faster_whisper import WhisperModel
 
 app=FastAPI(title="Hiten Clip AI API")
@@ -62,6 +65,55 @@ def make_highlights(rows, total, length):
 def srt_time(sec):
     ms=int(sec*1000); h=ms//3600000; ms%=3600000; m=ms//60000; ms%=60000; s=ms//1000; ms%=1000
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
+
+
+# YouTube OAuth: configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and PUBLIC_BASE_URL in Render.
+YOUTUBE_SCOPES=["https://www.googleapis.com/auth/youtube.upload","https://www.googleapis.com/auth/youtube.readonly"]
+oauth_states={}
+youtube_credentials=None
+youtube_channel=None
+def youtube_flow(state=None):
+    client_id=os.getenv("GOOGLE_CLIENT_ID"); client_secret=os.getenv("GOOGLE_CLIENT_SECRET")
+    if not client_id or not client_secret: raise HTTPException(503,"YouTube OAuth is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Render environment variables.")
+    redirect_uri=os.getenv("PUBLIC_BASE_URL","https://hiten-clip-ai.onrender.com").rstrip("/")+"/auth/youtube/callback"
+    cfg={"web":{"client_id":client_id,"client_secret":client_secret,"auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":[redirect_uri]}}
+    flow=Flow.from_client_config(cfg,scopes=YOUTUBE_SCOPES,state=state); flow.redirect_uri=redirect_uri
+    return flow
+@app.get("/auth/youtube")
+def youtube_auth():
+    import secrets
+    state=secrets.token_urlsafe(24); oauth_states[state]=True
+    flow=youtube_flow(state)
+    url,_=flow.authorization_url(access_type="offline",include_granted_scopes="true",prompt="consent")
+    return RedirectResponse(url)
+@app.get("/auth/youtube/callback")
+def youtube_callback(code:str,state:str):
+    global youtube_credentials,youtube_channel
+    if not oauth_states.pop(state,None): raise HTTPException(400,"Invalid or expired OAuth state. Connect again.")
+    flow=youtube_flow(state); flow.fetch_token(code=code); youtube_credentials=flow.credentials
+    yt=build("youtube","v3",credentials=youtube_credentials)
+    data=yt.channels().list(part="snippet",mine=True).execute()
+    items=data.get("items",[])
+    youtube_channel=items[0]["snippet"]["title"] if items else "Connected channel"
+    return {"connected":True,"channel":youtube_channel,"message":"YouTube channel connected. You can close this tab and return to Hiten Clip AI."}
+@app.get("/youtube/status")
+def youtube_status():
+    return {"connected":youtube_credentials is not None,"channel":youtube_channel}
+@app.post("/youtube/upload")
+async def youtube_upload(video:UploadFile=File(...),title:str=Form(...),description:str=Form(""),tags:str=Form(""),privacy_status:str=Form("private")):
+    if youtube_credentials is None: raise HTTPException(401,"Connect your YouTube channel first.")
+    if privacy_status not in ("private","unlisted","public"): raise HTTPException(400,"Invalid privacy status.")
+    ext=Path(video.filename or "clip.mp4").suffix or ".mp4"; path=f"/tmp/{uuid.uuid4()}{ext}"
+    with open(path,"wb") as f: f.write(await video.read())
+    try:
+        yt=build("youtube","v3",credentials=youtube_credentials)
+        body={"snippet":{"title":title[:100],"description":description[:5000],"tags":[x.strip() for x in tags.split(",") if x.strip()][:500],"categoryId":"22"},"status":{"privacyStatus":privacy_status,"selfDeclaredMadeForKids":False}}
+        response=yt.videos().insert(part="snippet,status",body=body,media_body=MediaFileUpload(path,chunksize=-1,resumable=True)).execute()
+        return {"videoId":response.get("id"),"privacyStatus":privacy_status}
+    except Exception as e: raise HTTPException(500,str(e))
+    finally:
+        try: os.remove(path)
+        except: pass
 
 @app.get("/")
 def root(): return {"name":"Hiten Clip AI API","status":"online"}
