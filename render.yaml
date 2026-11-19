@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: hiten-clip-ai-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: WHISPER_MODEL
+        value: small
